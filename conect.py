@@ -95,7 +95,7 @@ def main():
             if enviado != enviado_inicial:
                 status_atual = "✔️" if enviado else ""
                 atualizar_status(i, status_atual)
-                st.experimental_rerun()
+                st.rerun()
 
     # Botão para atualizar os dados
     if st.button("🔄 Atualizar dados"):
