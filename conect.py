@@ -8,7 +8,8 @@ import urllib.parse
 @st.cache_resource
 def conectar_sheet():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+    creds_dict = dict(st.secrets["gspread_credentials"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     sheet = client.open('lista').sheet1
     return sheet
