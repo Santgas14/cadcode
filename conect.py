@@ -20,10 +20,12 @@ def obter_dados():
     data = sheet.get_all_records()
     return pd.DataFrame(data)
 
-# Atualizar status na planilha
-def atualizar_status(index, status):
+# Atualizar status e informações adicionais na planilha
+def atualizar_status(index, status, num_utilizado, nenhum_funcionou):
     sheet = conectar_sheet()
-    sheet.update_cell(index + 2, 6, status)
+    sheet.update_cell(index + 2, 6, status)          # STATUS na coluna 6 (F)
+    sheet.update_cell(index + 2, 7, num_utilizado)   # NÚMERO UTILIZADO coluna 7 (G)
+    sheet.update_cell(index + 2, 8, nenhum_funcionou) # NENHUM FUNCIONOU coluna 8 (H)
 
 # Gerar link para WhatsApp
 def gerar_link_whatsapp(numero, mensagem):
@@ -59,9 +61,11 @@ def main():
 
     st.subheader("📒 Contatos para envio")
 
-    # Exibir contatos com containers separados claramente
+    # Exibir contatos com containers separados
     for i, row in df.iterrows():
         enviado_inicial = row['STATUS'] == '✔️'
+        nenhum_funcionou_inicial = row.get('NENHUM FUNCIONOU', '') == 'Sim'
+        numero_utilizado_inicial = row.get('NÚMERO UTILIZADO', 'WHATSAPP')
 
         with st.container(border=True):
             cols = st.columns([2.5, 1, 1])
@@ -78,23 +82,55 @@ def main():
             else:
                 cols[2].warning("❌ Pendente")
 
-            # Links WhatsApp abaixo dos nomes (melhor organização)
-            numeros_whatsapp = [row['WHATSAPP'], row.get('WHATSAPP2'), row.get('WHATSAPP3')]
-            numeros_whatsapp = [num for num in numeros_whatsapp if num]
+            numeros_whatsapp = {
+                'WHATSAPP': row['WHATSAPP'],
+                'WHATSAPP2': row.get('WHATSAPP2', ''),
+                'WHATSAPP3': row.get('WHATSAPP3', '')
+            }
+            numeros_whatsapp = {k: v for k, v in numeros_whatsapp.items() if v}
 
+            # WhatsApp links
             if modelo_msg:
                 mensagem_personalizada = modelo_msg.format(nome=row['NOME'])
                 links = ' | '.join(
-                    [f"[📲 {num}]({gerar_link_whatsapp(num, mensagem_personalizada)})" for num in numeros_whatsapp]
+                    [f"[📲 {k}: {v}]({gerar_link_whatsapp(v, mensagem_personalizada)})" for k, v in numeros_whatsapp.items()]
                 )
                 st.markdown(f"**WhatsApp:** {links}", unsafe_allow_html=True)
             else:
                 st.info("⚠️ Preencha o modelo da mensagem acima para gerar os links do WhatsApp.")
 
-            # Atualizar o status
-            if enviado != enviado_inicial:
+            # Opções adicionais
+            col_extra1, col_extra2 = st.columns(2)
+
+            # Número utilizado
+            numero_utilizado = col_extra1.radio(
+                "📞 Qual número foi utilizado?",
+                options=list(numeros_whatsapp.keys()),
+                index=list(numeros_whatsapp.keys()).index(numero_utilizado_inicial) if numero_utilizado_inicial in numeros_whatsapp else 0,
+                key=f"num_usado_{i}"
+            )
+
+            # Nenhum número funcionou
+            nenhum_funcionou = col_extra2.checkbox(
+                "❌ Nenhum número funcionou",
+                value=nenhum_funcionou_inicial,
+                key=f"nenhum_{i}"
+            )
+
+            # Atualizar informações na planilha ao mudar status ou opções
+            if (enviado != enviado_inicial or 
+                numero_utilizado != numero_utilizado_inicial or 
+                nenhum_funcionou != nenhum_funcionou_inicial):
+
                 status_atual = "✔️" if enviado else ""
-                atualizar_status(i, status_atual)
+                nenhum_funcionou_atual = "Sim" if nenhum_funcionou else ""
+
+                atualizar_status(
+                    i, 
+                    status_atual, 
+                    numero_utilizado if not nenhum_funcionou else "",
+                    nenhum_funcionou_atual
+                )
                 st.rerun()
 
     # Botão para atualizar os dados
