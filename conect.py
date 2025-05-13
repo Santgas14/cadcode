@@ -20,25 +20,21 @@ def obter_dados():
     data = sheet.get_all_records()
     return pd.DataFrame(data)
 
-# Atualizar status e informações adicionais na planilha
-def atualizar_status(index, status, num_utilizado, nenhum_funcionou):
-    sheet = conectar_sheet()
-    sheet.update_cell(index + 2, 6, status)          # STATUS na coluna 6 (F)
-    sheet.update_cell(index + 2, 7, num_utilizado)   # NÚMERO UTILIZADO coluna 7 (G)
-    sheet.update_cell(index + 2, 8, nenhum_funcionou) # NENHUM FUNCIONOU coluna 8 (H)
-
 # Gerar link para WhatsApp
 def gerar_link_whatsapp(numero, mensagem):
     mensagem_encoded = urllib.parse.quote(mensagem)
     return f"https://wa.me/55{numero}?text={mensagem_encoded}"
 
-# Função principal da interface Streamlit
+# Função principal Streamlit
 def main():
     st.set_page_config(page_title="Envio WhatsApp", layout="wide")
     st.title("📱 Envio Automático WhatsApp")
 
     # Modelo da mensagem
-    modelo_msg = st.text_area("📝 Modelo da Mensagem", placeholder="Digite a mensagem aqui. Use {nome} para personalizar automaticamente.")
+    modelo_msg = st.text_area(
+        "📝 Modelo da Mensagem",
+        placeholder="Digite a mensagem aqui. Use {nome} para personalizar automaticamente."
+    )
 
     # Carregar dados
     df = obter_dados()
@@ -61,6 +57,10 @@ def main():
 
     st.subheader("📒 Contatos para envio")
 
+    # Inicializa session_state para armazenar mudanças
+    if 'mudancas' not in st.session_state:
+        st.session_state.mudancas = {}
+
     # Exibir contatos com containers separados
     for i, row in df.iterrows():
         enviado_inicial = row['STATUS'] == '✔️'
@@ -76,7 +76,7 @@ def main():
             # Checkbox status de envio
             enviado = cols[1].checkbox("✅ Enviado?", value=enviado_inicial, key=f"status_{i}")
 
-            # Feedback visual mais claro
+            # Feedback visual
             if enviado:
                 cols[2].success("✔️ Enviado")
             else:
@@ -93,7 +93,8 @@ def main():
             if modelo_msg:
                 mensagem_personalizada = modelo_msg.format(nome=row['NOME'])
                 links = ' | '.join(
-                    [f"[📲 {k}: {v}]({gerar_link_whatsapp(v, mensagem_personalizada)})" for k, v in numeros_whatsapp.items()]
+                    [f"[📲 {k}: {v}]({gerar_link_whatsapp(v, mensagem_personalizada)})"
+                     for k, v in numeros_whatsapp.items()]
                 )
                 st.markdown(f"**WhatsApp:** {links}", unsafe_allow_html=True)
             else:
@@ -117,24 +118,34 @@ def main():
                 key=f"nenhum_{i}"
             )
 
-            # Atualizar informações na planilha ao mudar status ou opções
-            if (enviado != enviado_inicial or 
-                numero_utilizado != numero_utilizado_inicial or 
+            # Armazenar alterações temporariamente
+            if (enviado != enviado_inicial or
+                numero_utilizado != numero_utilizado_inicial or
                 nenhum_funcionou != nenhum_funcionou_inicial):
 
-                status_atual = "✔️" if enviado else ""
-                nenhum_funcionou_atual = "Sim" if nenhum_funcionou else ""
+                st.session_state.mudancas[i] = {
+                    'STATUS': "✔️" if enviado else "",
+                    'NÚMERO UTILIZADO': "" if nenhum_funcionou else numero_utilizado,
+                    'NENHUM FUNCIONOU': "Sim" if nenhum_funcionou else ""
+                }
 
-                atualizar_status(
-                    i, 
-                    status_atual, 
-                    numero_utilizado if not nenhum_funcionou else "",
-                    nenhum_funcionou_atual
-                )
-                st.rerun()
+    # Aplicar alterações na planilha com um único botão
+    if st.session_state.mudancas:
+        if st.button("💾 Salvar alterações na planilha"):
+            sheet = conectar_sheet()
+            for idx, mudanca in st.session_state.mudancas.items():
+                sheet.update_cell(idx + 2, 6, mudanca['STATUS'])
+                sheet.update_cell(idx + 2, 7, mudanca['NÚMERO UTILIZADO'])
+                sheet.update_cell(idx + 2, 8, mudanca['NENHUM FUNCIONOU'])
+            st.success("Alterações salvas com sucesso! ✅")
+            st.session_state.mudancas = {}
+            st.cache_resource.clear()
+            st.rerun()
+    else:
+        st.info("Nenhuma alteração pendente.")
 
-    # Botão para atualizar os dados
-    if st.button("🔄 Atualizar dados"):
+    # Atualizar dados sem salvar alterações
+    if st.button("🔄 Atualizar dados sem salvar"):
         st.cache_resource.clear()
         st.rerun()
 
