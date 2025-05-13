@@ -59,32 +59,18 @@ def main():
 
     st.subheader("📒 Contatos para envio")
 
-    # Exibir contatos com expanders
+    # Exibir contatos com containers separados claramente
     for i, row in df.iterrows():
         enviado_inicial = row['STATUS'] == '✔️'
-        
-        with st.expander(f"🔹 {row['NOME']} ({row['ESTADO']})", expanded=False):
-            cols = st.columns([2, 1, 1])
 
-            # Links WhatsApp organizados
-            numeros_whatsapp = [row['WHATSAPP'], row.get('WHATSAPP2'), row.get('WHATSAPP3')]
-            numeros_whatsapp = [num for num in numeros_whatsapp if num]
+        with st.container(border=True):
+            cols = st.columns([2.5, 1, 1])
 
-            if modelo_msg:
-                mensagem_personalizada = modelo_msg.format(nome=row['NOME'])
-                for num in numeros_whatsapp:
-                    link_whatsapp = gerar_link_whatsapp(num, mensagem_personalizada)
-                    cols[0].markdown(f"[📲 WhatsApp {num}]({link_whatsapp})", unsafe_allow_html=True)
-            else:
-                cols[0].info("Preencha o modelo da mensagem acima para gerar os links do WhatsApp.")
+            # Nome e Estado
+            cols[0].markdown(f"### 👤 {row['NOME']} ({row['ESTADO']})")
 
             # Checkbox status de envio
-            enviado = cols[1].checkbox("Enviado?", value=enviado_inicial, key=f"status_{i}")
-
-            if enviado != enviado_inicial:
-                status_atual = "✔️" if enviado else ""
-                atualizar_status(i, status_atual)
-                st.experimental_rerun()
+            enviado = cols[1].checkbox("✅ Enviado?", value=enviado_inicial, key=f"status_{i}")
 
             # Feedback visual mais claro
             if enviado:
@@ -92,10 +78,29 @@ def main():
             else:
                 cols[2].warning("❌ Pendente")
 
-    # Atualizar dados
+            # Links WhatsApp abaixo dos nomes (melhor organização)
+            numeros_whatsapp = [row['WHATSAPP'], row.get('WHATSAPP2'), row.get('WHATSAPP3')]
+            numeros_whatsapp = [num for num in numeros_whatsapp if num]
+
+            if modelo_msg:
+                mensagem_personalizada = modelo_msg.format(nome=row['NOME'])
+                links = ' | '.join(
+                    [f"[📲 {num}]({gerar_link_whatsapp(num, mensagem_personalizada)})" for num in numeros_whatsapp]
+                )
+                st.markdown(f"**WhatsApp:** {links}", unsafe_allow_html=True)
+            else:
+                st.info("⚠️ Preencha o modelo da mensagem acima para gerar os links do WhatsApp.")
+
+            # Atualizar o status
+            if enviado != enviado_inicial:
+                status_atual = "✔️" if enviado else ""
+                atualizar_status(i, status_atual)
+                st.experimental_rerun()
+
+    # Botão para atualizar os dados
     if st.button("🔄 Atualizar dados"):
         st.cache_resource.clear()
-        st.experimental_rerun()
+        st.rerun()
 
 if __name__ == "__main__":
     main()
