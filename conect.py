@@ -25,19 +25,44 @@ def gerar_link_whatsapp(numero, mensagem):
     mensagem_encoded = urllib.parse.quote(mensagem)
     return f"https://wa.me/55{numero}?text={mensagem_encoded}"
 
+# Atualizar planilha
+def salvar_mudancas(mudancas):
+    sheet = conectar_sheet()
+    for idx, mudanca in mudancas.items():
+        sheet.update_cell(idx + 2, 6, mudanca['STATUS'])
+        sheet.update_cell(idx + 2, 7, mudanca['NÚMERO UTILIZADO'])
+        sheet.update_cell(idx + 2, 8, mudanca['NENHUM FUNCIONOU'])
+
 # Função principal Streamlit
 def main():
     st.set_page_config(page_title="Envio WhatsApp", layout="wide")
     st.title("📱 Envio Automático WhatsApp")
 
-    # Modelo da mensagem
     modelo_msg = st.text_area(
         "📝 Modelo da Mensagem",
         placeholder="Digite a mensagem aqui. Use {nome} para personalizar automaticamente."
     )
 
-    # Carregar dados
     df = obter_dados()
+
+    # Inicializa session_state para mudanças
+    if 'mudancas' not in st.session_state:
+        st.session_state.mudancas = {}
+
+    # Botões no topo
+    col_top1, col_top2 = st.columns(2)
+    with col_top1:
+        if st.button("💾 Salvar alterações"):
+            salvar_mudancas(st.session_state.mudancas)
+            st.success("Alterações salvas com sucesso! ✅")
+            st.session_state.mudancas = {}
+            st.cache_resource.clear()
+            st.experimental_rerun()
+
+    with col_top2:
+        if st.button("🔄 Atualizar dados"):
+            st.cache_resource.clear()
+            st.experimental_rerun()
 
     # Sidebar com filtros
     with st.sidebar:
@@ -57,31 +82,16 @@ def main():
 
     st.subheader("📒 Contatos para envio")
 
-    # Inicializa session_state para armazenar mudanças
-    if 'mudancas' not in st.session_state:
-        st.session_state.mudancas = {}
-
-    # Exibir contatos com containers separados
+    # Exibir contatos organizados
     for i, row in df.iterrows():
         enviado_inicial = row['STATUS'] == '✔️'
         nenhum_funcionou_inicial = row.get('NENHUM FUNCIONOU', '') == 'Sim'
         numero_utilizado_inicial = row.get('NÚMERO UTILIZADO', 'WHATSAPP')
 
         with st.container(border=True):
-            cols = st.columns([2.5, 1, 1])
+            st.markdown(f"### 👤 {row['NOME']} ({row['ESTADO']})")
 
-            # Nome e Estado
-            cols[0].markdown(f"### 👤 {row['NOME']} ({row['ESTADO']})")
-
-            # Checkbox status de envio
-            enviado = cols[1].checkbox("✅ Enviado?", value=enviado_inicial, key=f"status_{i}")
-
-            # Feedback visual
-            if enviado:
-                cols[2].success("✔️ Enviado")
-            else:
-                cols[2].warning("❌ Pendente")
-
+            # WhatsApp links
             numeros_whatsapp = {
                 'WHATSAPP': row['WHATSAPP'],
                 'WHATSAPP2': row.get('WHATSAPP2', ''),
@@ -89,7 +99,6 @@ def main():
             }
             numeros_whatsapp = {k: v for k, v in numeros_whatsapp.items() if v}
 
-            # WhatsApp links
             if modelo_msg:
                 mensagem_personalizada = modelo_msg.format(nome=row['NOME'])
                 links = ' | '.join(
@@ -100,23 +109,38 @@ def main():
             else:
                 st.info("⚠️ Preencha o modelo da mensagem acima para gerar os links do WhatsApp.")
 
-            # Opções adicionais
-            col_extra1, col_extra2 = st.columns(2)
+            # Opções claramente organizadas
+            col1, col2, col3 = st.columns([1, 1, 2])
 
-            # Número utilizado
-            numero_utilizado = col_extra1.radio(
-                "📞 Qual número foi utilizado?",
+            # Checkbox enviado
+            enviado = col1.checkbox(
+                "✅ Enviado?",
+                value=enviado_inicial,
+                key=f"status_{i}"
+            )
+
+            # Checkbox nenhum número funcionou
+            nenhum_funcionou = col2.checkbox(
+                "❌ Nenhum funcionou",
+                value=nenhum_funcionou_inicial,
+                key=f"nenhum_{i}"
+            )
+
+            # Escolha do número usado
+            numero_utilizado = col3.selectbox(
+                "📞 Número utilizado",
                 options=list(numeros_whatsapp.keys()),
                 index=list(numeros_whatsapp.keys()).index(numero_utilizado_inicial) if numero_utilizado_inicial in numeros_whatsapp else 0,
                 key=f"num_usado_{i}"
             )
 
-            # Nenhum número funcionou
-            nenhum_funcionou = col_extra2.checkbox(
-                "❌ Nenhum número funcionou",
-                value=nenhum_funcionou_inicial,
-                key=f"nenhum_{i}"
-            )
+            # Feedback visual
+            if enviado:
+                st.success("✔️ Enviado")
+            elif nenhum_funcionou:
+                st.error("❌ Nenhum número funcionou")
+            else:
+                st.warning("⚠️ Pendente")
 
             # Armazenar alterações temporariamente
             if (enviado != enviado_inicial or
@@ -129,25 +153,8 @@ def main():
                     'NENHUM FUNCIONOU': "Sim" if nenhum_funcionou else ""
                 }
 
-    # Aplicar alterações na planilha com um único botão
-    if st.session_state.mudancas:
-        if st.button("💾 Salvar alterações na planilha"):
-            sheet = conectar_sheet()
-            for idx, mudanca in st.session_state.mudancas.items():
-                sheet.update_cell(idx + 2, 6, mudanca['STATUS'])
-                sheet.update_cell(idx + 2, 7, mudanca['NÚMERO UTILIZADO'])
-                sheet.update_cell(idx + 2, 8, mudanca['NENHUM FUNCIONOU'])
-            st.success("Alterações salvas com sucesso! ✅")
-            st.session_state.mudancas = {}
-            st.cache_resource.clear()
-            st.rerun()
-    else:
+    if not st.session_state.mudancas:
         st.info("Nenhuma alteração pendente.")
-
-    # Atualizar dados sem salvar alterações
-    if st.button("🔄 Atualizar dados sem salvar"):
-        st.cache_resource.clear()
-        st.rerun()
 
 if __name__ == "__main__":
     main()
