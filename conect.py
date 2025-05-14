@@ -43,26 +43,32 @@ def main():
         placeholder="Digite a mensagem aqui. Use {nome} para personalizar automaticamente."
     )
 
+    # Botões no topo
+    col_top1, col_top2 = st.columns([1, 1])
+    with col_top1:
+        salvar_botao = st.button("💾 Salvar alterações")
+    with col_top2:
+        atualizar_botao = st.button("🔄 Atualizar dados")
+
     df = obter_dados()
 
     # Inicializa session_state para mudanças
     if 'mudancas' not in st.session_state:
         st.session_state.mudancas = {}
 
-    # Botões no topo
-    col_top1, col_top2 = st.columns(2)
-    with col_top1:
-        if st.button("💾 Salvar alterações"):
+    if salvar_botao:
+        if st.session_state.mudancas:
             salvar_mudancas(st.session_state.mudancas)
             st.success("Alterações salvas com sucesso! ✅")
             st.session_state.mudancas = {}
             st.cache_resource.clear()
             st.experimental_rerun()
+        else:
+            st.info("Nenhuma alteração para salvar.")
 
-    with col_top2:
-        if st.button("🔄 Atualizar dados"):
-            st.cache_resource.clear()
-            st.experimental_rerun()
+    if atualizar_botao:
+        st.cache_resource.clear()
+        st.experimental_rerun()
 
     # Sidebar com filtros
     with st.sidebar:
@@ -109,32 +115,30 @@ def main():
             else:
                 st.info("⚠️ Preencha o modelo da mensagem acima para gerar os links do WhatsApp.")
 
-            # Opções claramente organizadas
-            col1, col2, col3 = st.columns([1, 1, 2])
+            # Checkbox e radio organizados claramente
+            cols = st.columns([1, 1, 2])
 
-            # Checkbox enviado
-            enviado = col1.checkbox(
+            enviado = cols[0].checkbox(
                 "✅ Enviado?",
                 value=enviado_inicial,
                 key=f"status_{i}"
             )
 
-            # Checkbox nenhum número funcionou
-            nenhum_funcionou = col2.checkbox(
+            nenhum_funcionou = cols[1].checkbox(
                 "❌ Nenhum funcionou",
                 value=nenhum_funcionou_inicial,
                 key=f"nenhum_{i}"
             )
 
-            # Escolha do número usado
-            numero_utilizado = col3.selectbox(
-                "📞 Número utilizado",
+            numero_utilizado = cols[2].radio(
+                "📞 Qual número foi utilizado?",
                 options=list(numeros_whatsapp.keys()),
                 index=list(numeros_whatsapp.keys()).index(numero_utilizado_inicial) if numero_utilizado_inicial in numeros_whatsapp else 0,
+                horizontal=True,
                 key=f"num_usado_{i}"
             )
 
-            # Feedback visual
+            # Feedback visual claro
             if enviado:
                 st.success("✔️ Enviado")
             elif nenhum_funcionou:
@@ -142,7 +146,7 @@ def main():
             else:
                 st.warning("⚠️ Pendente")
 
-            # Armazenar alterações temporariamente
+            # Registrar alterações
             if (enviado != enviado_inicial or
                 numero_utilizado != numero_utilizado_inicial or
                 nenhum_funcionou != nenhum_funcionou_inicial):
