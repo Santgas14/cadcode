@@ -62,13 +62,13 @@ def main():
             st.success("Alterações salvas com sucesso! ✅")
             st.session_state.mudancas = {}
             st.cache_resource.clear()
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.info("Nenhuma alteração para salvar.")
 
     if atualizar_botao:
         st.cache_resource.clear()
-        st.experimental_rerun()
+        st.rerun()
 
     # Sidebar com filtros
     with st.sidebar:
